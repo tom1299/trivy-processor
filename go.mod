@@ -1,4 +1,4 @@
-module trivy-processor
+module github.com/tom1299/trivy-processor
 
 go 1.22
 

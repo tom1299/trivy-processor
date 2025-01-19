@@ -9,11 +9,8 @@ import (
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"github.com/tom1299/trivy-processor/utils"
 )
-
-type Context struct {
-	Config map[string]interface{}
-}
 
 func main() {
 	e := echo.New()
@@ -22,37 +19,44 @@ func main() {
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 
+	// Create context
+	ctx := utils.CreateContext()
+
 	// Routes
-	e.PUT("/report", handleReport)
+	e.PUT("/report", func(c echo.Context) error {
+		return handleReport(c, ctx)
+	})
 
 	// Start server
 	e.Logger.Fatal(e.Start(":8080"))
 }
 
-func handleReport(c echo.Context) error {
+func handleReport(c echo.Context, ctx *utils.Context) error {
 	var jsonData map[string]interface{}
 	if err := c.Bind(&jsonData); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
 	}
 
-	// Print the JSON to stdout
-	report, err := json.MarshalIndent(jsonData, "", "  ")
+	// Marshal the JSON data to a byte array
+	report, err := json.Marshal(jsonData)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to process JSON"})
 	}
 
-	logReport(report, &Context{})
-	sendReportToGitLab(report, &Context{})
+	// Print the JSON to stdout
+	fmt.Fprintln(os.Stdout, string(report))
+
+	// Send the report to GitLab
+	if err := sendReportToGitLab(c, report); err != nil {
+		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to send report to GitLab"})
+	}
 
 	return c.JSON(http.StatusOK, map[string]string{"status": "Report received"})
 }
 
-func logReport(report []byte, context *Context) {
-	fmt.Fprintln(os.Stdout, string(report))
-}
-
-func sendReportToGitLab(report []byte, context *Context) error {
-	additionalHeaders := context.Config["trivyProcessorGitLabAdditionalHeaders"].(string)
+func sendReportToGitLab(c echo.Context, report []byte) error {
+	// Get the additional headers from the context
+	additionalHeaders := c.Get("trivyProcessorGitLabAdditionalHeaders").(string)
 	headers := make(map[string]string)
 	for _, header := range strings.Split(additionalHeaders, ",") {
 		parts := strings.SplitN(header, "=", 2)
@@ -61,8 +65,10 @@ func sendReportToGitLab(report []byte, context *Context) error {
 		}
 	}
 
-	url := context.Config["trivyProcessorGitLabURL"].(string)
+	// Get the URL from the context
+	url := c.Get("trivyProcessorGitLabURL").(string)
 
+	// Create a new request
 	req, err := http.NewRequest("POST", url, strings.NewReader(string(report)))
 	if err != nil {
 		return err
@@ -72,6 +78,7 @@ func sendReportToGitLab(report []byte, context *Context) error {
 		req.Header.Set(key, value)
 	}
 
+	// Send the request
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
