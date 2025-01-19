@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -23,7 +22,7 @@ func main() {
 	ctx := utils.CreateContext()
 
 	// Routes
-	e.PUT("/report", func(c echo.Context) error {
+	e.POST("/report", func(c echo.Context) error {
 		return handleReport(c, ctx)
 	})
 
@@ -43,20 +42,22 @@ func handleReport(c echo.Context, ctx *utils.Context) error {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to process JSON"})
 	}
 
-	// Print the JSON to stdout
-	fmt.Fprintln(os.Stdout, string(report))
-
 	// Send the report to GitLab
-	if err := sendReportToGitLab(c, report); err != nil {
+	if err := sendReportToGitLab(*ctx, report); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to send report to GitLab"})
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{"status": "Report received"})
 }
 
-func sendReportToGitLab(c echo.Context, report []byte) error {
-	// Get the additional headers from the context
-	additionalHeaders := c.Get("trivyProcessorGitLabAdditionalHeaders").(string)
+func sendReportToGitLab(c utils.Context, report []byte) error {
+	url, ok := c.Config["GitlabUrl"].(string)
+	if !ok {
+		return fmt.Errorf("GitLab URL is not configured")
+	}
+
+	additionalHeaders, _ := c.Config["GitLabAdditionalHeaders"].(string)
+
 	headers := make(map[string]string)
 	for _, header := range strings.Split(additionalHeaders, ",") {
 		parts := strings.SplitN(header, "=", 2)
@@ -65,10 +66,6 @@ func sendReportToGitLab(c echo.Context, report []byte) error {
 		}
 	}
 
-	// Get the URL from the context
-	url := c.Get("trivyProcessorGitLabURL").(string)
-
-	// Create a new request
 	req, err := http.NewRequest("POST", url, strings.NewReader(string(report)))
 	if err != nil {
 		return err

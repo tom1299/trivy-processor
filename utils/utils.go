@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"unicode"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 type Context struct {
@@ -53,23 +55,10 @@ func GetConfigFromFiles(ctx *Context) {
 }
 
 func toCamelCase(s string) string {
-	var result []rune
-	upperNext := false
-	for i, r := range s {
-		if r == '_' {
-			upperNext = true
-		} else {
-			if upperNext {
-				result = append(result, unicode.ToUpper(r))
-				upperNext = false
-			} else {
-				if i == 0 {
-					result = append(result, unicode.ToLower(r))
-				} else {
-					result = append(result, r)
-				}
-			}
-		}
+	words := strings.Split(s, "_")
+	result := ""
+	for _, word := range words {
+		result += cases.Title(language.Und).String(word)
 	}
-	return string(result)
+	return result
 }
