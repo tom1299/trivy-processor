@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: trivy-operator
+  name: trivy-processor
 data:
   {{- range $key, $value := .Values.config }}
   {{ $key }}: {{ $value | quote }}
