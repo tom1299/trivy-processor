@@ -56,7 +56,7 @@ func sendReportToGitLab(c utils.Context, report []byte) error {
 		return fmt.Errorf("GitLab URL is not configured")
 	}
 
-	additionalHeaders, _ := c.Config["GitLabAdditionalHeaders"].(string)
+	additionalHeaders, _ := c.Config["GitlabAdditionalHeaders"].(string)
 
 	headers := make(map[string]string)
 	for _, header := range strings.Split(additionalHeaders, ",") {
@@ -66,11 +66,10 @@ func sendReportToGitLab(c utils.Context, report []byte) error {
 		}
 	}
 
-	req, err := http.NewRequest("POST", url, strings.NewReader(string(report)))
+	req, err := http.NewRequest("PUT", url, strings.NewReader(string(report)))
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "application/json")
 	for key, value := range headers {
 		req.Header.Set(key, value)
 	}
@@ -83,9 +82,9 @@ func sendReportToGitLab(c utils.Context, report []byte) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to send report to GitLab, status code: %d", resp.StatusCode)
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
+		return nil
+	} else {
+		return fmt.Errorf("failed to send report to GitLab: %s", resp.Status)
 	}
-
-	return nil
 }
