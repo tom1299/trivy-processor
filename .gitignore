@@ -27,7 +27,7 @@ bin/
 build/
 
 # Debug binaries
-__debug_bin*/
+__debug_bin*
 
 # Logs
 *.log

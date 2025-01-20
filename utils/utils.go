@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
@@ -61,4 +64,15 @@ func toCamelCase(s string) string {
 		result += cases.Title(language.Und).String(word)
 	}
 	return result
+}
+
+func GenerateUniqueID(info string) string {
+	randomBytes := make([]byte, 16)
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		panic("failed to generate random bytes")
+	}
+	data := hex.EncodeToString(randomBytes) + info
+	hash := sha256.Sum256([]byte(data))
+	return hex.EncodeToString(hash[:])[:8]
 }

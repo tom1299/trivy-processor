@@ -56,6 +56,9 @@ func sendReportToGitLab(c utils.Context, report []byte) error {
 		return fmt.Errorf("GitLab URL is not configured")
 	}
 
+	reportVersion := "v1.0.0-" + utils.GenerateUniqueID(string(report))
+	url = fmt.Sprintf(url, reportVersion)
+
 	additionalHeaders, _ := c.Config["GitlabAdditionalHeaders"].(string)
 
 	headers := make(map[string]string)
