@@ -1,0 +1,17 @@
+# Exclude the vendor directory
+vendor/
+
+# Exclude the build output directories
+bin/
+build/
+
+# Exclude IDE specific files
+.vscode/
+.idea/
+
+# Exclude OS generated files
+.DS_Store
+Thumbs.db
+
+# Exclude other unnecessary files
+*.log
