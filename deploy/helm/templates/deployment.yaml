@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "trivy-processor.fullname" . }}1
+  name: {{ include "trivy-processor.fullname" . }}
   labels:
     {{- include "trivy-processor.labels" . | nindent 4 }}
 spec:
@@ -36,6 +36,12 @@ spec:
                 - ALL
             readOnlyRootFilesystem: true
             runAsNonRoot: true
-      nodeSelector: {{ .Values.nodeSelector }}
-      tolerations: {{- toYaml .Values.tolerations | nindent 8 }}
-      affinity: {{- toYaml .Values.affinity | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ . }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
