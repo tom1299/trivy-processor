@@ -24,11 +24,15 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - containerPort: 8080
+          {{ with .Values.config -}}
           envFrom:
             - configMapRef:
                 name: trivy-processor
+          {{ end -}}
+          {{ if .Values.envs -}}
           env:
             {{- toYaml .Values.envs | nindent 12 }}
+          {{ end -}}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:

@@ -2,7 +2,7 @@ replicaCount: 1
 
 image:
   repository: ghcr.io/tom1299/trivy-processor
-  tag: v1.0.0
+  tag: v1.1.0
   pullPolicy: IfNotPresent
 
 service:
@@ -22,7 +22,3 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
-
-config:
-  TRIVY_PROCESSOR_LOG_LEVEL: "info"
-  TRIVY_PROCESSOR_NAMESPACE: "default"

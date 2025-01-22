@@ -35,3 +35,6 @@ __debug_bin*
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Custom values for the helm chart
+deploy/helm/additional_values.yaml
