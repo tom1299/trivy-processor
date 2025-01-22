@@ -38,3 +38,6 @@ Thumbs.db
 
 # Custom values for the helm chart
 deploy/helm/additional_values.yaml
+
+# Ignore all files in the secrets folder
+deploy/helm/secrets/*

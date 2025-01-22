@@ -49,15 +49,16 @@ func GetConfigFromFiles(ctx *Context) {
 	if err == nil {
 		for _, file := range files {
 			fileName := file.Name()
-			envVarName := "TRIVY_PROCESSOR_" + strings.ToUpper(fileName)
-			camelKey := toCamelCase(strings.TrimPrefix(envVarName, "TRIVY_PROCESSOR_"))
-			content, err := os.ReadFile("/etc/trivy-processor/" + fileName)
-			if err == nil {
-				if _, exists := ctx.Config[camelKey]; exists {
-					fmt.Printf("Warning: Key %s already exists in context. Overwriting with value from file.\n", camelKey)
+			if !strings.HasPrefix(fileName, "TRIVY_PROCESSOR_") {
+				camelKey := toCamelCase(strings.TrimPrefix(fileName, "TRIVY_PROCESSOR_"))
+				content, err := os.ReadFile("/etc/trivy-processor/" + fileName)
+				if err == nil {
+					if _, exists := ctx.Config[camelKey]; exists {
+						fmt.Printf("Warning: Key %s already exists in context. Overwriting with value from file.\n", camelKey)
+					}
+					fmt.Printf("File %s found and used in context as %s\n", fileName, camelKey)
+					ctx.Config[camelKey] = string(content)
 				}
-				fmt.Printf("File %s found and used in context as %s\n", fileName, camelKey)
-				ctx.Config[camelKey] = string(content)
 			}
 		}
 	}
