@@ -1,13 +1,18 @@
 package utils
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"strings"
+	"time"
 
+	"github.com/labstack/echo/v4"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 )
@@ -51,6 +56,7 @@ func GetConfigFromFiles(ctx *Context) {
 				if _, exists := ctx.Config[camelKey]; exists {
 					fmt.Printf("Warning: Key %s already exists in context. Overwriting with value from file.\n", camelKey)
 				}
+				fmt.Printf("File %s found and used in context as %s\n", fileName, camelKey)
 				ctx.Config[camelKey] = string(content)
 			}
 		}
@@ -75,4 +81,49 @@ func GenerateUniqueID(info string) string {
 	data := hex.EncodeToString(randomBytes) + info
 	hash := sha256.Sum256([]byte(data))
 	return hex.EncodeToString(hash[:])[:8]
+}
+
+type loggingRoundTripper struct {
+	rt     http.RoundTripper
+	logger echo.Logger
+}
+
+func (lrt *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	lrt.logger.Infof("Request URL: %s", req.URL)
+
+	if req.Body != nil {
+		bodyBytes, _ := io.ReadAll(req.Body)
+		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // Reset the body
+		truncatedBody := string(bodyBytes)
+		if len(truncatedBody) > 100 {
+			truncatedBody = truncatedBody[:100] + "..."
+		}
+		lrt.logger.Infof("Request Body: %s", truncatedBody)
+	}
+
+	resp, err := lrt.rt.RoundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+
+	lrt.logger.Infof("Response Status: %s", resp.Status)
+
+	if resp.Body != nil {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		req.Body = io.NopCloser(bytes.NewBuffer(bodyBytes)) // Reset the body
+		truncatedBody := string(bodyBytes)
+		if len(truncatedBody) > 100 {
+			truncatedBody = truncatedBody[:100] + "..."
+		}
+		lrt.logger.Infof("Response Body: %s", truncatedBody)
+	}
+
+	return resp, nil
+}
+
+func NewLoggingHTTPClient(logger echo.Logger) *http.Client {
+	return &http.Client{
+		Timeout:   10 * time.Second,
+		Transport: &loggingRoundTripper{rt: http.DefaultTransport, logger: logger},
+	}
 }

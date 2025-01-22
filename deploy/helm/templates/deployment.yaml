@@ -27,6 +27,8 @@ spec:
           envFrom:
             - configMapRef:
                 name: trivy-processor
+          env:
+            {{- toYaml .Values.envs | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           securityContext:

@@ -14,7 +14,7 @@ ARG GOOS=linux
 ARG GOARCH=amd64
 RUN CGO_ENABLED=0 GOOS=$GOOS GOARCH=$GOARCH go build -o main .
 
-FROM scratch
+FROM alpine:latest
 
 # Use a non-root user with UID 10001 for security
 USER 10001

@@ -13,6 +13,8 @@ import (
 
 func main() {
 	e := echo.New()
+	e.Debug = true
+	e.Logger.SetLevel(0)
 
 	// Middleware
 	e.Use(middleware.Logger())
@@ -23,34 +25,38 @@ func main() {
 
 	// Routes
 	e.POST("/report", func(c echo.Context) error {
-		return handleReport(c, ctx)
+		return handleReport(c, ctx, e.Logger)
 	})
 
 	// Start server
-	e.Logger.Fatal(e.Start(":8080"))
+	e.Logger.Info(e.Start(":8080"))
 }
 
-func handleReport(c echo.Context, ctx *utils.Context) error {
+func handleReport(c echo.Context, ctx *utils.Context, logger echo.Logger) error {
+	logger.Info("Received report")
 	var jsonData map[string]interface{}
 	if err := c.Bind(&jsonData); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
 	}
+	logger.Info("Read JSON")
 
 	// Marshal the JSON data to a byte array
 	report, err := json.Marshal(jsonData)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to process JSON"})
 	}
+	logger.Info("Marshalled report")
 
 	// Send the report to GitLab
-	if err := sendReportToGitLab(*ctx, report); err != nil {
+	if err := sendReportToGitLab(*ctx, report, logger); err != nil {
+		logger.Errorf("Error sending report to GitLab: %v", err)
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to send report to GitLab"})
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{"status": "Report received"})
 }
 
-func sendReportToGitLab(c utils.Context, report []byte) error {
+func sendReportToGitLab(c utils.Context, report []byte, logger echo.Logger) error {
 	url, ok := c.Config["GitlabUrl"].(string)
 	if !ok {
 		return fmt.Errorf("GitLab URL is not configured")
@@ -58,6 +64,9 @@ func sendReportToGitLab(c utils.Context, report []byte) error {
 
 	reportVersion := "v1.0.0-" + utils.GenerateUniqueID(string(report))
 	url = fmt.Sprintf(url, reportVersion)
+
+	// Log the URL
+	logger.Infof("Sending report to GitLab: %s", url)
 
 	additionalHeaders, _ := c.Config["GitlabAdditionalHeaders"].(string)
 
@@ -77,8 +86,10 @@ func sendReportToGitLab(c utils.Context, report []byte) error {
 		req.Header.Set(key, value)
 	}
 
+	// Use the custom logging HTTP client
+	client := utils.NewLoggingHTTPClient(logger)
+
 	// Send the request
-	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
