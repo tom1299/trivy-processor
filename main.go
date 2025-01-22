@@ -33,19 +33,15 @@ func main() {
 }
 
 func handleReport(c echo.Context, ctx *utils.Context, logger echo.Logger) error {
-	logger.Info("Received report")
 	var jsonData map[string]interface{}
 	if err := c.Bind(&jsonData); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON"})
 	}
-	logger.Info("Read JSON")
 
-	// Marshal the JSON data to a byte array
 	report, err := json.Marshal(jsonData)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Failed to process JSON"})
 	}
-	logger.Info("Marshalled report")
 
 	// Send the report to GitLab
 	if err := sendReportToGitLab(*ctx, report, logger); err != nil {
@@ -64,12 +60,9 @@ func sendReportToGitLab(c utils.Context, report []byte, logger echo.Logger) erro
 
 	reportVersion := "v1.0.0-" + utils.GenerateUniqueID(string(report))
 	url = fmt.Sprintf(url, reportVersion)
-
-	// Log the URL
 	logger.Infof("Sending report to GitLab: %s", url)
 
 	additionalHeaders, _ := c.Config["GitlabAdditionalHeaders"].(string)
-
 	headers := make(map[string]string)
 	for _, header := range strings.Split(additionalHeaders, ",") {
 		parts := strings.SplitN(header, "=", 2)
@@ -86,10 +79,7 @@ func sendReportToGitLab(c utils.Context, report []byte, logger echo.Logger) erro
 		req.Header.Set(key, value)
 	}
 
-	// Use the custom logging HTTP client
 	client := utils.NewLoggingHTTPClient(logger)
-
-	// Send the request
 	resp, err := client.Do(req)
 	if err != nil {
 		return err

@@ -89,7 +89,7 @@ type loggingRoundTripper struct {
 }
 
 func (lrt *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	lrt.logger.Infof("Request URL: %s", req.URL)
+	lrt.logger.Debugf("Request URL: %s", req.URL)
 
 	if req.Body != nil {
 		bodyBytes, _ := io.ReadAll(req.Body)
@@ -98,7 +98,7 @@ func (lrt *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 		if len(truncatedBody) > 100 {
 			truncatedBody = truncatedBody[:100] + "..."
 		}
-		lrt.logger.Infof("Request Body: %s", truncatedBody)
+		lrt.logger.Debugf("Request Body: %s", truncatedBody)
 	}
 
 	resp, err := lrt.rt.RoundTrip(req)
@@ -106,7 +106,7 @@ func (lrt *loggingRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 		return nil, err
 	}
 
-	lrt.logger.Infof("Response Status: %s", resp.Status)
+	lrt.logger.Debugf("Response Status: %s", resp.Status)
 
 	if resp.Body != nil {
 		bodyBytes, _ := io.ReadAll(resp.Body)
