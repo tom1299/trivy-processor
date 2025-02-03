@@ -33,14 +33,31 @@ func convertToJSON(data []byte) (VulnerabilityReport, error) {
 
 // Construct report name
 func constructReportName(report VulnerabilityReport) string {
-	timestamp, _ := time.Parse(time.RFC3339, report.Metadata.CreationTimestamp)
-	formattedTimestamp := timestamp.Format("20060102150405")
-	return fmt.Sprintf("vulnerability-report-%s-%s-%s-%s:1.0.0-%s",
+	return fmt.Sprintf("vulnerability-report-%s-%s-%s",
 		report.Metadata.Labels.Namespace,
 		report.Metadata.Labels.ResourceKind,
-		report.Metadata.Labels.ResourceName,
-		report.Metadata.Labels.ContainerName,
-		formattedTimestamp)
+		report.Metadata.Labels.ResourceName)
+}
+
+func generateSemanticVersion(report VulnerabilityReport) (string, error) {
+	// Parse the creation timestamp
+	t, err := time.Parse(time.RFC3339, report.Metadata.CreationTimestamp)
+	if err != nil {
+		return "", err
+	}
+
+	// Extract the date components
+	major := 25
+	minor := int(t.Month())
+	patch := t.Day()
+
+	// Optionally include additional metadata (e.g., hour and minute)
+	preRelease := fmt.Sprintf("%02d%02d", t.Hour(), t.Minute())
+
+	// Combine to form a valid semantic version
+	version := fmt.Sprintf("%d.%d.%d-%s", major, minor, patch, preRelease)
+
+	return version, nil
 }
 
 func main() {
@@ -90,9 +107,19 @@ func sendReportToGitLab(c utils.Context, report []byte, logger echo.Logger) erro
 		return fmt.Errorf("GitLab URL is not configured")
 	}
 
-	reportVersion := "v1.0.0-" + utils.GenerateUniqueID(string(report))
-	url = fmt.Sprintf(url, reportVersion)
-	logger.Infof("Sending report to GitLab: %s", url)
+	json_report, err := convertToJSON(report)
+	if err != nil {
+		return fmt.Errorf("failed to convert report to JSON: %v", err)
+	}
+	reportVersion, err := generateSemanticVersion(json_report)
+	if err != nil {
+		return fmt.Errorf("failed to generate semantic version: %v", err)
+	}
+	reportName := constructReportName(json_report)
+
+	packageURL := fmt.Sprintf("%spackages/generic/trivy-reports/%s/%s.json", url, reportVersion, reportName)
+
+	logger.Infof("Sending report to GitLab: %s", packageURL)
 
 	additionalHeaders, _ := c.Config["GitlabAdditionalHeaders"].(string)
 	headers := make(map[string]string)
@@ -103,13 +130,14 @@ func sendReportToGitLab(c utils.Context, report []byte, logger echo.Logger) erro
 		}
 	}
 
-	req, err := http.NewRequest("PUT", url, strings.NewReader(string(report)))
+	req, err := http.NewRequest("PUT", packageURL, strings.NewReader(string(report)))
 	if err != nil {
 		return err
 	}
 	for key, value := range headers {
 		req.Header.Set(key, value)
 	}
+	req.Header.Set("Content-Type", "multipart/form-data")
 
 	client := utils.NewLoggingHTTPClient(logger)
 	resp, err := client.Do(req)
@@ -118,9 +146,50 @@ func sendReportToGitLab(c utils.Context, report []byte, logger echo.Logger) erro
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusCreated {
-		return nil
-	} else {
-		return fmt.Errorf("failed to send report to GitLab: %s", resp.Status)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("unexpected response status code: %d", resp.StatusCode)
+
 	}
+
+	triggerPipelineURL := fmt.Sprintf("%spipeline", url)
+
+	triggerPayload := map[string]interface{}{
+		"ref": "main",
+		"variables": []map[string]string{
+			{"key": "REPORT_VERSION", "value": reportVersion},
+			{"key": "REPORT_NAME", "value": reportName},
+		},
+	}
+
+	logger.Infof("Triggering pipeline for report: %s using url: %s", reportName, triggerPipelineURL)
+
+	payloadBytes, err := json.Marshal(triggerPayload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal trigger payload: %v", err)
+	}
+
+	triggerReq, err := http.NewRequest("POST", triggerPipelineURL, strings.NewReader(string(payloadBytes)))
+	if err != nil {
+
+		return fmt.Errorf("failed to create pipeline trigger request: %v", err)
+	}
+	for key, value := range headers {
+		triggerReq.Header.Set(key, value)
+	}
+
+	triggerReq.Header.Set("Content-Type", "application/json")
+
+	triggerResp, err := client.Do(triggerReq)
+	if err != nil {
+		return fmt.Errorf("failed to trigger pipeline: %v", err)
+	}
+	defer triggerResp.Body.Close()
+
+	if triggerResp.StatusCode < 200 || triggerResp.StatusCode >= 300 {
+		return fmt.Errorf("unexpected response status code when triggering pipeline: %d", triggerResp.StatusCode)
+	}
+
+	logger.Infof("Pipeline triggered successfully for report: %s", reportName)
+
+	return nil
 }
