@@ -5,11 +5,43 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/tom1299/trivy-processor/utils"
 )
+
+type VulnerabilityReport struct {
+	Metadata struct {
+		Labels struct {
+			ContainerName string `json:"trivy-operator.container.name"`
+			ResourceKind  string `json:"trivy-operator.resource.kind"`
+			ResourceName  string `json:"trivy-operator.resource.name"`
+			Namespace     string `json:"trivy-operator.resource.namespace"`
+		} `json:"labels"`
+		CreationTimestamp string `json:"creationTimestamp"`
+	} `json:"metadata"`
+}
+
+// Convert byte array to JSON
+func convertToJSON(data []byte) (VulnerabilityReport, error) {
+	var report VulnerabilityReport
+	err := json.Unmarshal(data, &report)
+	return report, err
+}
+
+// Construct report name
+func constructReportName(report VulnerabilityReport) string {
+	timestamp, _ := time.Parse(time.RFC3339, report.Metadata.CreationTimestamp)
+	formattedTimestamp := timestamp.Format("20060102150405")
+	return fmt.Sprintf("vulnerability-report-%s-%s-%s-%s:1.0.0-%s",
+		report.Metadata.Labels.Namespace,
+		report.Metadata.Labels.ResourceKind,
+		report.Metadata.Labels.ResourceName,
+		report.Metadata.Labels.ContainerName,
+		formattedTimestamp)
+}
 
 func main() {
 	e := echo.New()

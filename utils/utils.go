@@ -49,7 +49,7 @@ func GetConfigFromFiles(ctx *Context) {
 	if err == nil {
 		for _, file := range files {
 			fileName := file.Name()
-			if !strings.HasPrefix(fileName, "TRIVY_PROCESSOR_") {
+			if strings.HasPrefix(fileName, "TRIVY_PROCESSOR_") {
 				camelKey := toCamelCase(strings.TrimPrefix(fileName, "TRIVY_PROCESSOR_"))
 				content, err := os.ReadFile("/etc/trivy-processor/" + fileName)
 				if err == nil {
